@@ -1,5 +1,5 @@
 llm:
-  name: "llama3.2:1b"
+  name: "llama3.2:3b"
   
 vectordb:
   collection_name: "ethics"
@@ -7,5 +7,5 @@ vectordb:
   name: "nomic-embed-text"
   chunk_size: 800
   chunk_overlap: 80
-  score_threshold: 0.0
-  top_k: 5
+  score_threshold: 0.2
+  top_k: 10

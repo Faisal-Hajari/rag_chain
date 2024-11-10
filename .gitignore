@@ -1,3 +1,4 @@
 docs 
 vecdb
 test.py
+*.log
