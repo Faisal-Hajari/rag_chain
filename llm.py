@@ -11,7 +11,7 @@ class LLM():
         llm = OllamaLLM(model=config['llm']["name"])
         self.chain = llm | StrOutputParser()
     
-    def predict(self, text:str): 
+    def __call__(self, text:str): 
         return self.chain.invoke(text)
 
 
