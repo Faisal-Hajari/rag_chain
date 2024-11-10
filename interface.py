@@ -1,8 +1,23 @@
 import streamlit as st
 import os
+from functools import partial
+from llm import Prompt, LLM, VectorDB
+import yaml
+import prompts
+import logging 
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# Add a file handler to save logs to a file
+file_handler = logging.FileHandler('app.log')
+file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+logger.addHandler(file_handler)
 
 # Function to handle PDF upload
-def upload_pdf(doc_path:str="docs"):
+def upload_pdf(vdb:VectorDB, doc_path:str="docs"):
     st.title("Upload PDF File")
     uploaded_files = st.file_uploader("Choose a PDF file", 
                                      type="pdf", 
@@ -15,6 +30,8 @@ def upload_pdf(doc_path:str="docs"):
             if not os.path.exists(save_path):
                 with open(save_path, "wb") as f:
                     f.write(uploaded_file.getbuffer())
+    vdb.add_document(doc_path)
+    
 
 # Function for the Chatbot
 def chatbot(responed:callable= lambda x: "Hello!"):
@@ -61,8 +78,34 @@ def side_bar(
 def clear_history(): 
     st.session_state.messages = []
 
+def read_config(config_path: str):
+    with open(config_path, "r") as file:
+        config = yaml.safe_load(file)
+    return config
+
+
+def concat_context(docs):
+    # print("*****", docs[0].keys())
+    context = "".join([doc.page_content+"\n\n" for doc in docs])
+    return context
+
+def answer(llm:LLM, vdb:VectorDB, prompt:Prompt, messages):
+    question = messages[-1]["content"]
+    docs = vdb.search(question)
+    context = concat_context(docs)
+    prompt = prompt(question=question, context=context)
+    logger.info(f"Prompt: {prompt}")
+    response = llm(prompt)
+    return response
+
+
 # Main app
 def main():
+    conifg = read_config("config.yaml")
+    llama = LLM(conifg)
+    vdb = VectorDB(conifg)
+    prompt = Prompt(prompts.retrieval_prompt)
+
     # Set up custom page config for smaller sidebar
     st.set_page_config(page_title="Streamlit App", layout="wide", initial_sidebar_state="expanded")
     # Custom CSS to reduce sidebar width
@@ -84,7 +127,11 @@ def main():
     
     # Run the sidebar
     side_bar(
-        tabs={"Upload PDF":upload_pdf, "Chatbot":chatbot},
+        tabs={"Upload PDF":partial(upload_pdf, vdb), 
+        "Chatbot":partial(chatbot,
+                            partial(answer, llama, vdb, prompt)
+                        )
+        },
         buttons={"Clear History":clear_history}
     )
 
