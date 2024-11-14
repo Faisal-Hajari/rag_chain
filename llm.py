@@ -6,6 +6,10 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 import re 
 from langchain_ollama.chat_models import ChatOllama
 
+import torch
+import torch.nn.functional as F
+from transformers import AutoTokenizer, AutoModel
+
 class LLM(): 
     def __init__(self, config): 
         #TODO: read all needed config from the yaml 
@@ -23,9 +27,18 @@ class LLM():
 class VectorDB(): 
     def __init__(self, config):
         self.config = config   
-        self.embedding_model = OllamaEmbeddings(model=self.config["vectordb"]["name"])
+        # self.embedding_model = OllamaEmbeddings(model=self.config["vectordb"]["name"])
+        # self.embedding_model = HuggingFaceInstructEmbeddings(
+        #     model_name= "nvidia/NV-Embed-v2",
+        #     model_kwargs={"device": "cuda:0", "trust_remote_code":True, "token":False},
+        #     encode_kwargs={}, 
+        #     embed_instruction="",
+        #     query_instruction="Instruct: Given a question, retrieve passages that answer the question\nQuery:",
+        #     cache_folder="cache"
+        # )
+        # self.emebedding_model = LocalEmbedding()
         self.vdb = Chroma(collection_name=self.config["vectordb"]["collection_name"],
-                        embedding_function=self.embedding_model, 
+                        embedding_function= LocalEmbedding(), 
                         persist_directory=self.config["vectordb"]["persist_directory"]
                         )
         self.name = self.config["vectordb"]["collection_name"]
@@ -109,11 +122,23 @@ class Prompt():
         key = match.group(1).strip()
         return self.replacements[key]
 
+from langchain_core.embeddings import Embeddings
+from pydantic import BaseModel
 
-#TODO: implement the class QueryRewarding
-class QueryRewarding(): 
+class LocalEmbedding(BaseModel, Embeddings): 
+    def __init__(self): 
+        self.model = AutoModel.from_pretrained("jinaai/jina-embeddings-v3", trust_remote_code=True)
+
     
-    def __init__(self, config):
-        pass
-    def __call__(self, *args, **kwds):
-        pass
+    def embed_documents(self, texts):
+        return self._embed(texts, instruction="retrieval.passage")
+    
+    def embed_query(self, text):
+        return self._embed(text, task="retrieval.query")
+    
+
+    @torch.no_grad()
+    def _embed(self, texts, task):
+        with torch.no_grad(): 
+            texts_embedding = self.encode(texts, task=task)  
+        return texts_embedding.tolist()
