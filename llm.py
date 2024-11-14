@@ -123,9 +123,7 @@ class Prompt():
         return self.replacements[key]
 
 from langchain_core.embeddings import Embeddings
-from pydantic import BaseModel
-
-class LocalEmbedding(BaseModel, Embeddings): 
+class LocalEmbedding(Embeddings): 
     def __init__(self): 
         self.model = AutoModel.from_pretrained("jinaai/jina-embeddings-v3", trust_remote_code=True)
 
@@ -140,5 +138,5 @@ class LocalEmbedding(BaseModel, Embeddings):
     @torch.no_grad()
     def _embed(self, texts, task):
         with torch.no_grad(): 
-            texts_embedding = self.encode(texts, task=task)  
+            texts_embedding = self.model.encode(texts, task=task)  
         return texts_embedding.tolist()
