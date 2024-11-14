@@ -51,14 +51,18 @@ def chatbot(responed:callable= lambda x: "Hello!"):
         # Display user message in chat message container
         with st.chat_message("user"):
             st.markdown(prompt)
-        # Generate assistant response
-        response, prompt = responed(st.session_state.messages)
-        logger.info(prompt+response)
-        # Display assistant response in chat message container
+
+        # Stream chat messages from the chatbot
         with st.chat_message("assistant"):
-            st.markdown(response)
-        # Add assistant response to chat history
+            response = "" 
+            response_placeholder = st.empty()
+            for chunk in responed(st.session_state.messages):
+                response += chunk
+                response_placeholder.markdown(response)
+
+        # Add chatbot response to chat history
         st.session_state.messages.append({"role": "assistant", "content": response})
+        logger.info(response)
 
 def side_bar(
         tabs:dict[str:callable]={"Upload PDF":upload_pdf, "Chatbot":chatbot},

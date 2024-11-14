@@ -4,16 +4,21 @@ from langchain_chroma import Chroma
 from langchain_community.document_loaders import PyPDFDirectoryLoader, PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import re 
+from langchain_ollama.chat_models import ChatOllama
 
 class LLM(): 
     def __init__(self, config): 
         #TODO: read all needed config from the yaml 
-        llm = OllamaLLM(model=config['llm']["name"])
+        # llm = OllamaLLM(model=config['llm']["name"])
+        llm = ChatOllama(model=config['llm']["name"])
         self.chain = llm | StrOutputParser()
     
     def __call__(self, text:str): 
         return self.chain.invoke(text)
 
+    def stream(self, message:str):
+        for chunk in self.chain.stream(message):
+            yield chunk
 
 class VectorDB(): 
     def __init__(self, config):
