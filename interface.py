@@ -5,6 +5,7 @@ from llm import Prompt, LLM, VectorDB
 import yaml
 import prompts
 import logging 
+import ops 
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -51,7 +52,8 @@ def chatbot(responed:callable= lambda x: "Hello!"):
         with st.chat_message("user"):
             st.markdown(prompt)
         # Generate assistant response
-        response = responed(st.session_state.messages)
+        response, prompt = responed(st.session_state.messages)
+        logger.info(prompt+response)
         # Display assistant response in chat message container
         with st.chat_message("assistant"):
             st.markdown(response)
@@ -83,28 +85,11 @@ def read_config(config_path: str):
         config = yaml.safe_load(file)
     return config
 
-
-def concat_context(docs):
-    # print("*****", docs[0].keys())
-    context = "".join([doc.page_content+"\n\n" for doc in docs])
-    return context
-
-def answer(llm:LLM, vdb:VectorDB, prompt:Prompt, messages):
-    question = messages[-1]["content"]
-    docs = vdb.search(question)
-    context = concat_context(docs)
-    prompt = prompt(question=question, context=context)
-    logger.info(f"Prompt: {prompt}")
-    response = llm(prompt)
-    return response
-
-
 # Main app
 def main():
     conifg = read_config("config.yaml")
     llama = LLM(conifg)
     vdb = VectorDB(conifg)
-    prompt = Prompt(prompts.retrieval_prompt)
 
     # Set up custom page config for smaller sidebar
     st.set_page_config(page_title="Streamlit App", layout="wide", initial_sidebar_state="expanded")
@@ -129,7 +114,7 @@ def main():
     side_bar(
         tabs={"Upload PDF":partial(upload_pdf, vdb), 
         "Chatbot":partial(chatbot,
-                            partial(answer, llama, vdb, prompt)
+                            partial(ops.rag_with_ref, llama, vdb)
                         )
         },
         buttons={"Clear History":clear_history}
