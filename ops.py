@@ -56,13 +56,19 @@ def concat_docs_with_referance(docs):
     )
     return context
 
-def rag_with_ref(llm:LLM, vdb:VectorDB, messages:list[dict[str:str]]) -> str:
+def rag_with_ref(llm:LLM, vdb:VectorDB, messages:list[dict[str:str]]):
     rew_query, _ = query_rewriter(llm, messages)
     multi_query_res, _ = multi_query(llm, rew_query)
     queries = multi_query_res.split("\n")
     docs = [] 
     for query in queries:
-        docs.extend(vdb.search(query)) 
+        docs.extend(vdb.compress_search(query)) 
+    ids = []
+    for i, doc in enumerate(docs):
+        if doc.metadata["id"] in set(ids):
+            docs.pop(i)
+        else:
+            ids.append(doc.metadata["id"])
     context = concat_docs_with_referance(docs)
 
     rag_prompt = Prompt(prompts.chat_prompt)(
@@ -70,7 +76,5 @@ def rag_with_ref(llm:LLM, vdb:VectorDB, messages:list[dict[str:str]]) -> str:
             history=gen_history(messages),
             assistant_prompt= Prompt(prompts.role_assistant_prompt)(response="")
     )
-    # response = llm(rag_prompt)
-    # return response, rag_prompt
     for chunk in llm.stream(rag_prompt):
         yield chunk, rag_prompt

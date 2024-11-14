@@ -1,9 +1,9 @@
 llm:
-  name: "llama3.2:3b"
+  name: "llama3.1:8b"
 vectordb:
   collection_name: "ethics"
   persist_directory: "vecdb"
-  name: "nomic-embed-text"
+  name: "bge-m3"
   chunk_size: 800
   chunk_overlap: 80
   score_threshold: 0.4

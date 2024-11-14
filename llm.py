@@ -5,10 +5,12 @@ from langchain_community.document_loaders import PyPDFDirectoryLoader, PyPDFLoad
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import re 
 from langchain_ollama.chat_models import ChatOllama
-
+from langchain_core.embeddings import Embeddings
 import torch
 import torch.nn.functional as F
 from transformers import AutoTokenizer, AutoModel
+from langchain.retrievers import ContextualCompressionRetriever
+from langchain.retrievers.document_compressors import FlashrankRerank
 
 class LLM(): 
     def __init__(self, config): 
@@ -27,21 +29,13 @@ class LLM():
 class VectorDB(): 
     def __init__(self, config):
         self.config = config   
-        # self.embedding_model = OllamaEmbeddings(model=self.config["vectordb"]["name"])
-        # self.embedding_model = HuggingFaceInstructEmbeddings(
-        #     model_name= "nvidia/NV-Embed-v2",
-        #     model_kwargs={"device": "cuda:0", "trust_remote_code":True, "token":False},
-        #     encode_kwargs={}, 
-        #     embed_instruction="",
-        #     query_instruction="Instruct: Given a question, retrieve passages that answer the question\nQuery:",
-        #     cache_folder="cache"
-        # )
-        # self.emebedding_model = LocalEmbedding()
+        self.embedding_model = OllamaEmbeddings(model=self.config["vectordb"]["name"])
         self.vdb = Chroma(collection_name=self.config["vectordb"]["collection_name"],
-                        embedding_function= LocalEmbedding(), 
+                        embedding_function= self.embedding_model, 
                         persist_directory=self.config["vectordb"]["persist_directory"]
                         )
         self.name = self.config["vectordb"]["collection_name"]
+        self.k = self.config["vectordb"]["top_k"]
     
     def add_document(self, document:str):
         existing_items = self.vdb.get(include=[])
@@ -90,11 +84,24 @@ class VectorDB():
             
         
     def search(self, query:str):
-        retriver = self.vdb.as_retriever(
+        retriever = self.vdb.as_retriever(
             search_type="similarity_score_threshold",
-            search_kwargs={'score_threshold': self.config["vectordb"]["score_threshold"], 'k': 6}
+            search_kwargs={'score_threshold': self.config["vectordb"]["score_threshold"], 'k': self.k}
             )
-        return retriver.invoke(query)
+        return retriever.invoke(query)
+    
+    def compress_search(self, query:str):
+        retriever = self.vdb.as_retriever(
+        search_type="similarity_score_threshold",
+        search_kwargs={'score_threshold': self.config["vectordb"]["score_threshold"], 'k': 4*self.k}
+        )
+        compressor = FlashrankRerank(top_n=self.k, model="ms-marco-MultiBERT-L-12")
+        compression_retriever = ContextualCompressionRetriever(
+            base_compressor=compressor, base_retriever=retriever
+        )
+        return compression_retriever.invoke(query)
+
+
 
 
 class Prompt(): 
@@ -122,14 +129,13 @@ class Prompt():
         key = match.group(1).strip()
         return self.replacements[key]
 
-from langchain_core.embeddings import Embeddings
 class LocalEmbedding(Embeddings): 
     def __init__(self): 
-        self.model = AutoModel.from_pretrained("jinaai/jina-embeddings-v3", trust_remote_code=True)
+        self.model = AutoModel.from_pretrained("jinaai/jina-embeddings-v3", trust_remote_code=True).cuda()
 
     
     def embed_documents(self, texts):
-        return self._embed(texts, instruction="retrieval.passage")
+        return self._embed(texts, task="retrieval.passage")
     
     def embed_query(self, text):
         return self._embed(text, task="retrieval.query")
