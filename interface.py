@@ -56,7 +56,10 @@ def chatbot(responed:callable= lambda x: "Hello!"):
         with st.chat_message("assistant"):
             response = "" 
             response_placeholder = st.empty()
-            for chunk in responed(st.session_state.messages):
+            for i, chunk in enumerate(responed(st.session_state.messages)):
+                if i == 0:
+                    logger.info('prompt: '+chunk[1])
+                chunk, _ = chunk 
                 response += chunk
                 response_placeholder.markdown(response)
 
