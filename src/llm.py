@@ -10,7 +10,9 @@ class LLM():
     def __init__(self, config): 
         #TODO: read all needed config from the yaml 
         # llm = OllamaLLM(model=config['llm']["name"])
-        llm = ChatOllama(model=config['llm']["name"])
+        llm = ChatOllama(model=config['llm']["name"],
+                         base_url="http://ollama:11434/"
+                         )
         self.chain = llm | StrOutputParser()
     
     def __call__(self, text:str): 
@@ -23,7 +25,9 @@ class LLM():
 class VectorDB(): 
     def __init__(self, config):
         self.config = config   
-        self.embedding_model = OllamaEmbeddings(model=self.config["vectordb"]["name"])
+        self.embedding_model = OllamaEmbeddings(model=self.config["vectordb"]["name"],
+                                                base_url="http://ollama:11434/"
+                                                )
         self.vdb = Chroma(collection_name=self.config["vectordb"]["collection_name"],
                         embedding_function=self.embedding_model, 
                         persist_directory=self.config["vectordb"]["persist_directory"]
