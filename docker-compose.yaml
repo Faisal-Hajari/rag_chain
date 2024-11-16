@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    volumes:
+      - ollama:/root/.ollama
+    ports:
+      - "11434:11434"
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    extra_hosts:
+      - "host.docker.internal:host-gateway" 
+  streamlit-app: 
+    build: 
+      context: . 
+      dockerfile: Dockerfile
+    container_name: streamlit-app
+    volumes:
+      - ./docs:/app/docs
+      - vecdb:/app/vecdb
+    ports:
+      - "8501:8501"
+    restart: unless-stopped
+    depends_on:
+      - ollama
+    extra_hosts:
+      - "host.docker.internal:host-gateway" 
+    
+volumes:
+  ollama:
+  vecdb:
+  docs: 
