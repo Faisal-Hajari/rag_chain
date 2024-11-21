@@ -6,9 +6,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 import re 
 from langchain_ollama.chat_models import ChatOllama
 from langchain_core.embeddings import Embeddings
-import torch
-import torch.nn.functional as F
-from transformers import AutoTokenizer, AutoModel
+
 from langchain.retrievers import ContextualCompressionRetriever
 from langchain.retrievers.document_compressors import FlashrankRerank
 
@@ -128,21 +126,3 @@ class Prompt():
     def _replace_match(self, match):
         key = match.group(1).strip()
         return self.replacements[key]
-
-class LocalEmbedding(Embeddings): 
-    def __init__(self): 
-        self.model = AutoModel.from_pretrained("jinaai/jina-embeddings-v3", trust_remote_code=True).cuda()
-
-    
-    def embed_documents(self, texts):
-        return self._embed(texts, task="retrieval.passage")
-    
-    def embed_query(self, text):
-        return self._embed(text, task="retrieval.query")
-    
-
-    @torch.no_grad()
-    def _embed(self, texts, task):
-        with torch.no_grad(): 
-            texts_embedding = self.model.encode(texts, task=task)  
-        return texts_embedding.tolist()
